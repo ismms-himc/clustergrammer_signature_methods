@@ -60,6 +60,58 @@ def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_leve
 
     keep_rows = df_sig.index.tolist()
     df_data = deepcopy(df_data_ini.ix[keep_rows])
+
+    # calculate sim_mat of df_data and df_sig
+    cell_types = df_sig.columns.tolist()
+    barcodes = df_data.columns.tolist()
+    sim_mat = 1 - pairwise_distances(df_sig.transpose(), df_data.transpose(), metric=dist_type)
+    df_sim = pd.DataFrame(data=sim_mat, index=cell_types, columns=barcodes).transpose()
+
+    # get the top column value (most similar signature)
+    df_sim_top = df_sim.idxmax(axis=1)
+
+    # add predicted category name to top list
+    top_list = df_sim_top.get_values()
+    top_list = [ predict_level + ': ' + x[0] for x in top_list]
+
+    # add cell type category to input data
+    df_cat = deepcopy(df_data)
+    cols = df_cat.columns.tolist()
+    new_cols = []
+
+    # check whether the columns have the true category available
+    has_truth = False
+    if type(cols[0]) is tuple:
+        has_truth = True
+
+
+    if has_truth:
+        new_cols = [tuple(list(a) + [b]) for a,b in zip(cols, top_list)]
+    else:
+        new_cols = [tuple([a] + [b]) for a,b in zip(cols, top_list)]
+
+    # transfer new categories
+    df_cat.columns = new_cols
+
+    # keep track of true and predicted labels
+    y_info = {}
+    y_info['true'] = []
+    y_info['pred'] = []
+
+    if has_truth:
+        y_info['true'] = [x[truth_level].split(': ')[1] for x in cols]
+        y_info['pred'] = [x.split(': ')[1] for x in top_list]
+
+
+
+    return df_cat, df_sim.transpose(), df_sim.transpose(), y_info
+
+def OLD_predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_level='Predict Category',
+                           truth_level=1):
+    ''' Predict category using signature '''
+
+    keep_rows = df_sig.index.tolist()
+    df_data = deepcopy(df_data_ini.ix[keep_rows])
     # print('df_data: ', df_data.shape)
 
     # calculate sim_mat of df_data and df_sig
