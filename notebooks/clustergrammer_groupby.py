@@ -54,10 +54,9 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
 
     return df_sig, keep_genes, keep_genes_dict
 
-def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_level='Predict Category'):
+def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_level='Predict Category',
+                           truth_level=1):
     ''' Predict category using signature '''
-
-
 
     keep_rows = df_sig.index.tolist()
     df_data = deepcopy(df_data_ini.ix[keep_rows])
@@ -125,7 +124,7 @@ def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_leve
 
         if has_truth:
             # store true and predicted lists
-            y_info['true'].append(inst_col[1].split(': ')[1])
+            y_info['true'].append(inst_col[truth_level].split(': ')[1])
             y_info['pred'].append(top_list[i][0])
 
     df_cat.columns = new_cols
@@ -166,7 +165,8 @@ def confusion_matrix_and_correct_series(y_info):
 
 def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_shuffles=100,
                                            random_seed=99, pval_cutoff=0.05, dist_type='cosine',
-                                           num_top_dims=False, predict_level='Predict Category'):
+                                           num_top_dims=False, predict_level='Predict Category',
+                                           truth_level=1):
     random.seed(random_seed)
 
     perform_list = []
@@ -195,7 +195,7 @@ def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_
 
         # predict categories from signature
         df_pred_cat, df_sig_sim, df_sig_max, y_info = predict_cats_from_sigs(df_shuffle, df_sig,
-            dist_type=dist_type, predict_level=predict_level)
+            dist_type=dist_type, predict_level=predict_level, truth_level=truth_level)
 
         # calc confusion matrix and performance
         df_conf, true_count, pred_count, ser_correct, fraction_correct = confusion_matrix_and_correct_series(y_info)
