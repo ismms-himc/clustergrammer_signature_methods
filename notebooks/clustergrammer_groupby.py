@@ -6,24 +6,23 @@ from copy import deepcopy
 from sklearn.metrics import confusion_matrix
 from copy import deepcopy
 import numpy as np
+import random
 
 def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=False):
-    ''' Generate signatures for column categories '''
 
+    ''' Generate signatures for column categories '''
 
     df = row_tuple_to_multiindex(df_ini.transpose())
 
     cell_types = sorted(list(set(df.index.get_level_values(category_level).tolist())))
-
-    inst_level = 'Category'
 
     keep_genes = []
     keep_genes_dict = {}
 
     for inst_ct in cell_types:
 
-        inst_ct_mat = df.xs(key=inst_ct, level=inst_level)
-        inst_other_mat = df.drop(inst_ct, level=inst_level)
+        inst_ct_mat = df.xs(key=inst_ct, level=category_level)
+        inst_other_mat = df.drop(inst_ct, level=category_level)
 
         inst_stats, inst_pvals = ttest_ind(inst_ct_mat, inst_other_mat, axis=0)
 
@@ -40,16 +39,15 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
 
     keep_genes = sorted(list(set(keep_genes)))
 
-    df_gbm = df.groupby(level=inst_level).mean().transpose()
+    df_gbm = df.groupby(level=category_level).mean().transpose()
     cols = df_gbm.columns.tolist()
     new_cols = []
     for inst_col in cols:
-        new_col = (inst_col, inst_level + ': ' + inst_col)
+        new_col = (inst_col, category_level + ': ' + inst_col)
         new_cols.append(new_col)
     df_gbm.columns = new_cols
 
     df_sig = df_gbm.ix[keep_genes]
-
 
     if len(keep_genes) == 0:
         print('found no informative dimensions')
@@ -163,6 +161,37 @@ def confusion_matrix_and_correct_series(y_info):
     ser_correct = pd.Series(data=correct_list, index=all_cols)
 
     return df_conf, true_count, pred_count, ser_correct, fraction_correct
+
+
+def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_shuffles=100,
+                                           random_seed=99, pval_cutoff=0.05):
+    random.seed(random_seed)
+
+    perform_list = []
+    num_shuffles = num_shuffles
+
+    for inst_run in range(num_shuffles):
+
+        cols = df_data.columns.tolist()
+        rows = df_data.index.tolist()
+        mat = df_data.get_values()
+
+        shuffled_cols = deepcopy(cols)
+        random.shuffle(shuffled_cols)
+
+
+        df_shuffle = pd.DataFrame(data=mat, columns=shuffled_cols, index=rows)
+
+        df_sig, keep_genes, keep_genes_dict = generate_signatures(df_shuffle, category_level,
+                                                                      pval_cutoff=pval_cutoff)
+        df_pred_cat, df_sig_sim, df_sig_max, y_info = predict_cats_from_sigs(df_shuffle, df_sig)
+        df_conf, true_count, pred_count, ser_correct, fraction_correct = confusion_matrix_and_correct_series(y_info)
+        perform_list.append(fraction_correct)
+
+    perform_ser = pd.Series(perform_list)
+
+    return perform_ser
+
 
 def box_scatter_plot(df, group, columns=False, rand_seed=100, alpha=0.5,
     dot_color='red', num_row=None, num_col=1, figsize=(10,10),
