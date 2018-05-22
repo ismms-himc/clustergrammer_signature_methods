@@ -69,9 +69,10 @@ def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_leve
     df_sim = pd.DataFrame(data=sim_mat, index=cell_types, columns=barcodes).transpose()
     # print(df_sim.shape)
 
-    ser_list = []
+    # ser_list = []
     top_list = []
     rows = df_sim.index.tolist()
+
     for inst_row in rows:
 
         # make ser_data_sim
@@ -93,8 +94,8 @@ def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_leve
         top_list.append(found_ct)
         ser_list.append(max_ser)
 
-    # make matrix of top cell type identified
-    df_sim_top = pd.concat(ser_list, axis=1).transpose()
+    # # make matrix of top cell type identified
+    # df_sim_top = pd.concat(ser_list, axis=1).transpose()
 
     y_info = {}
     y_info['true'] = []
@@ -129,7 +130,7 @@ def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_leve
 
     df_cat.columns = new_cols
 
-    return df_cat, df_sim.transpose(), df_sim_top.transpose(), y_info
+    return df_cat, df_sim.transpose(), df_sim.transpose(), y_info
 
 
 def confusion_matrix_and_correct_series(y_info):
