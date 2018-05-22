@@ -166,13 +166,13 @@ def confusion_matrix_and_correct_series(y_info):
 
 def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_shuffles=100,
                                            random_seed=99, pval_cutoff=0.05, dist_type='cosine',
-                                           num_top_dims=False, predict_level):
+                                           num_top_dims=False, predict_level='Predict Category'):
     random.seed(random_seed)
 
     perform_list = []
     num_shuffles = num_shuffles
 
-    for inst_run in range(num_shuffles):
+    for inst_run in range(num_shuffles + 1):
 
         cols = df_data.columns.tolist()
         rows = df_data.index.tolist()
@@ -181,8 +181,12 @@ def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_
         shuffled_cols = deepcopy(cols)
         random.shuffle(shuffled_cols)
 
-
-        df_shuffle = pd.DataFrame(data=mat, columns=shuffled_cols, index=rows)
+        # do not perform shuffling the first time to confirm that we get the same
+        # results as the unshuffled dataaset
+        if inst_run == 0:
+            df_shuffle = deepcopy(df_data)
+        else:
+            df_shuffle = pd.DataFrame(data=mat, columns=shuffled_cols, index=rows)
 
         # generate signature on shuffled data
         df_sig, keep_genes, keep_genes_dict = generate_signatures(df_shuffle, category_level,
@@ -197,7 +201,10 @@ def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_
         df_conf, true_count, pred_count, ser_correct, fraction_correct = confusion_matrix_and_correct_series(y_info)
 
         # store performances of shuffles
-        perform_list.append(fraction_correct)
+        if inst_run > 0:
+            perform_list.append(fraction_correct)
+        else:
+            print('performance (fraction correct) of unshuffled: ' + str(fraction_correct))
 
     perform_ser = pd.Series(perform_list)
 
