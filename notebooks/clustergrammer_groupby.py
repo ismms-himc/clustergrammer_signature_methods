@@ -1,10 +1,175 @@
+import pandas as pd
+from scipy.stats import ttest_ind
+from copy import deepcopy
+from sklearn.metrics import pairwise_distances
+from copy import deepcopy
+from sklearn.metrics import confusion_matrix
+from copy import deepcopy
+import numpy as np
+
+def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=False):
+    ''' Generate signatures for column categories '''
+
+
+    df = row_tuple_to_multiindex(df_ini.transpose())
+
+    cell_types = sorted(list(set(df.index.get_level_values(category_level).tolist())))
+
+    inst_level = 'Category'
+
+    keep_genes = []
+    keep_genes_dict = {}
+
+    for inst_ct in cell_types:
+
+        inst_ct_mat = df.xs(key=inst_ct, level=inst_level)
+        inst_other_mat = df.drop(inst_ct, level=inst_level)
+
+        inst_stats, inst_pvals = ttest_ind(inst_ct_mat, inst_other_mat, axis=0)
+
+        ser_pval = pd.Series(data=inst_pvals, index=df.columns.tolist()).sort_values()
+
+        if num_top_dims == False:
+            ser_pval_keep = ser_pval[ser_pval < pval_cutoff]
+        else:
+            ser_pval_keep = ser_pval[:num_top_dims]
+
+        inst_keep = ser_pval_keep.index.tolist()
+        keep_genes.extend(inst_keep)
+        keep_genes_dict[inst_ct] = inst_keep
+
+    keep_genes = sorted(list(set(keep_genes)))
+
+    df_gbm = df.groupby(level=inst_level).mean().transpose()
+    cols = df_gbm.columns.tolist()
+    new_cols = []
+    for inst_col in cols:
+        new_col = (inst_col, inst_level + ': ' + inst_col)
+        new_cols.append(new_col)
+    df_gbm.columns = new_cols
+
+    df_sig = df_gbm.ix[keep_genes]
+
+
+    if len(keep_genes) == 0:
+        print('found no informative dimensions')
+
+    return df_sig, keep_genes, keep_genes_dict
+
+def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine'):
+    ''' Predict category using signature '''
+
+
+    keep_rows = df_sig.index.tolist()
+    df_data = deepcopy(df_data_ini.ix[keep_rows])
+    # print('df_data: ', df_data.shape)
+
+    # calculate sim_mat of df_data and df_sig
+    cell_types = df_sig.columns.tolist()
+    barcodes = df_data.columns.tolist()
+    sim_mat = 1 - pairwise_distances(df_sig.transpose(), df_data.transpose(), metric=dist_type)
+    df_sim = pd.DataFrame(data=sim_mat, index=cell_types, columns=barcodes).transpose()
+    # print(df_sim.shape)
+
+    ser_list = []
+    top_list = []
+    rows = df_sim.index.tolist()
+    for inst_row in rows:
+
+        # make ser_data_sim
+        inst_ser = df_sim.loc[[inst_row]]
+        inst_data = inst_ser.get_values()[0]
+        inst_cols = inst_ser.columns.tolist()
+        ser_data_sim = pd.Series(data=inst_data, index=inst_cols, name=inst_row).sort_values(ascending=False)
+
+        # define top matching cell type
+        top_ct_1 = ser_data_sim.index.tolist()[0]
+
+        # use cell type signature
+        found_ct = top_ct_1
+
+        # make binary matrix of ct_max
+        inst_zeros = np.zeros((len(inst_cols)))
+        max_ser = pd.Series(data=inst_zeros, index=inst_cols, name=inst_row)
+        max_ser[found_ct] = 1
+        top_list.append(found_ct)
+        ser_list.append(max_ser)
+
+    # make matrix of top cell type identified
+    df_sim_top = pd.concat(ser_list, axis=1).transpose()
+
+    y_info = {}
+    y_info['true'] = []
+    y_info['pred'] = []
+
+    # add cell type category to input data
+    df_cat = deepcopy(df_data)
+    cols = df_cat.columns.tolist()
+
+    # check whether the columns have the true category available
+    has_truth = False
+    if type(cols[0]) is tuple:
+        has_truth = True
+
+    new_cols = []
+    for i in range(len(cols)):
+
+        if has_truth:
+            inst_col = list(cols[i])
+            inst_col.append('Predict Category: ' + top_list[i][0])
+            new_col = tuple(inst_col)
+        else:
+            inst_col = cols[i]
+            new_col = (inst_col, 'Predict Category: ' + top_list[i][0])
+
+        new_cols.append(new_col)
+
+        if has_truth:
+            # store true and predicted lists
+            y_info['true'].append(inst_col[1].split(': ')[1])
+            y_info['pred'].append(top_list[i][0])
+
+    df_cat.columns = new_cols
+
+    return df_cat, df_sim.transpose(), df_sim_top.transpose(), y_info
+
+
+def confusion_matrix_and_correct_series(y_info):
+    ''' Generate confusion matrix from y_info '''
+
+
+    a = deepcopy(y_info['true'])
+    true_count = dict((i, a.count(i)) for i in set(a))
+
+    a = deepcopy(y_info['pred'])
+    pred_count = dict((i, a.count(i)) for i in set(a))
+
+    sorted_cats = sorted(list(set(y_info['true'])))
+    conf_mat = confusion_matrix(y_info['true'], y_info['pred'], sorted_cats)
+    df_conf = pd.DataFrame(conf_mat, index=sorted_cats, columns=sorted_cats)
+
+    total_correct = np.trace(df_conf)
+    total_pred = df_conf.sum().sum()
+    fraction_correct = total_correct/float(total_pred)
+
+    # calculate ser_correct
+    correct_list = []
+    cat_counts = df_conf.sum(axis=1)
+    all_cols = df_conf.columns.tolist()
+    for inst_cat in all_cols:
+        inst_correct = df_conf[inst_cat].loc[inst_cat] / cat_counts[inst_cat]
+        correct_list.append(inst_correct)
+
+    ser_correct = pd.Series(data=correct_list, index=all_cols)
+
+    return df_conf, true_count, pred_count, ser_correct, fraction_correct
+
 def box_scatter_plot(df, group, columns=False, rand_seed=100, alpha=0.5,
     dot_color='red', num_row=None, num_col=1, figsize=(10,10),
     start_title='Variable Measurements Across', end_title='Groups',
     group_list=False):
 
     from scipy import stats
-    import numpy as np
     import pandas as pd
 
     import matplotlib.pyplot as plt
