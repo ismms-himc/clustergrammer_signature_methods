@@ -54,8 +54,9 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
 
     return df_sig, keep_genes, keep_genes_dict
 
-def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine'):
+def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_level='Predict Category'):
     ''' Predict category using signature '''
+
 
 
     keep_rows = df_sig.index.tolist()
@@ -114,11 +115,11 @@ def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine'):
 
         if has_truth:
             inst_col = list(cols[i])
-            inst_col.append('Predict Category: ' + top_list[i][0])
+            inst_col.append(predict_level + ': ' + top_list[i][0])
             new_col = tuple(inst_col)
         else:
             inst_col = cols[i]
-            new_col = (inst_col, 'Predict Category: ' + top_list[i][0])
+            new_col = (inst_col, predict_level + ': ' + top_list[i][0])
 
         new_cols.append(new_col)
 
@@ -164,7 +165,8 @@ def confusion_matrix_and_correct_series(y_info):
 
 
 def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_shuffles=100,
-                                           random_seed=99, pval_cutoff=0.05):
+                                           random_seed=99, pval_cutoff=0.05, dist_type='cosine',
+                                           num_top_dims=False, predict_level):
     random.seed(random_seed)
 
     perform_list = []
@@ -182,10 +184,19 @@ def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_
 
         df_shuffle = pd.DataFrame(data=mat, columns=shuffled_cols, index=rows)
 
+        # generate signature on shuffled data
         df_sig, keep_genes, keep_genes_dict = generate_signatures(df_shuffle, category_level,
-                                                                      pval_cutoff=pval_cutoff)
-        df_pred_cat, df_sig_sim, df_sig_max, y_info = predict_cats_from_sigs(df_shuffle, df_sig)
+                                                                      pval_cutoff=pval_cutoff,
+                                                                      num_top_dims=num_top_dims)
+
+        # predict categories from signature
+        df_pred_cat, df_sig_sim, df_sig_max, y_info = predict_cats_from_sigs(df_shuffle, df_sig,
+            dist_type=dist_type, predict_level=predict_level)
+
+        # calc confusion matrix and performance
         df_conf, true_count, pred_count, ser_correct, fraction_correct = confusion_matrix_and_correct_series(y_info)
+
+        # store performances of shuffles
         perform_list.append(fraction_correct)
 
     perform_ser = pd.Series(perform_list)
