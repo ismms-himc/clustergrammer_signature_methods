@@ -62,6 +62,7 @@ sftp-config.json
 # python
 *.ipynb_checkpoints
 clustergrammer
+big_data
 
 # # eslint
 # .eslint*
