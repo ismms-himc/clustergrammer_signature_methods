@@ -213,7 +213,11 @@ def confusion_matrix_and_correct_series(y_info):
 
     ser_correct = pd.Series(data=correct_list, index=all_cols)
 
-    return df_conf, true_count, pred_count, ser_correct, fraction_correct
+    populations = {}
+    populations['true'] = true_count
+    populations['pred'] = pred_count
+
+    return df_conf, populations, ser_correct, fraction_correct
 
 
 def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_shuffles=100,
@@ -251,7 +255,7 @@ def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_
             dist_type=dist_type, predict_level=predict_level, truth_level=truth_level)
 
         # calc confusion matrix and performance
-        df_conf, true_count, pred_count, ser_correct, fraction_correct = confusion_matrix_and_correct_series(y_info)
+        df_conf, populations, ser_correct, fraction_correct = confusion_matrix_and_correct_series(y_info)
 
         # store performances of shuffles
         if inst_run > 0:
