@@ -104,7 +104,7 @@ def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_leve
 
 
 
-    return df_cat, df_sim.transpose(), df_sim.transpose(), y_info
+    return df_cat, df_sim.transpose(), y_info
 
 def OLD_predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_level='Predict Category',
                            truth_level=1):
@@ -247,7 +247,7 @@ def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_
                                                                       num_top_dims=num_top_dims)
 
         # predict categories from signature
-        df_pred_cat, df_sig_sim, df_sig_max, y_info = predict_cats_from_sigs(df_shuffle, df_sig,
+        df_pred_cat, df_sig_sim, y_info = predict_cats_from_sigs(df_shuffle, df_sig,
             dist_type=dist_type, predict_level=predict_level, truth_level=truth_level)
 
         # calc confusion matrix and performance
