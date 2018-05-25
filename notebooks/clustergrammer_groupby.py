@@ -54,12 +54,17 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
 
     return df_sig, keep_genes, keep_genes_dict
 
-def predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_level='Predict Category',
+def predict_cats_from_sigs(df_data_ini, df_sig_ini, dist_type='cosine', predict_level='Predict Category',
                            truth_level=1):
     ''' Predict category using signature '''
 
-    keep_rows = df_sig.index.tolist()
-    df_data = deepcopy(df_data_ini.ix[keep_rows])
+    keep_rows = df_sig_ini.index.tolist()
+    data_rows = df_data_ini.index.tolist()
+
+    common_rows = list(set(data_rows).intersection(keep_rows))
+
+    df_data = deepcopy(df_data_ini.ix[common_rows])
+    df_sig = deepcopy(df_sig_ini.ix[common_rows])
 
     # calculate sim_mat of df_data and df_sig
     cell_types = df_sig.columns.tolist()
