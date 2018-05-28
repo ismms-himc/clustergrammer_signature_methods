@@ -230,7 +230,7 @@ def confusion_matrix_and_correct_series(y_info):
     return df_conf, populations, ser_correct, fraction_correct
 
 
-def compare_performance_to_shuffled_labels(df_data, df_sig, category_level, num_shuffles=100,
+def compare_performance_to_shuffled_labels(df_data, category_level, num_shuffles=100,
                                            random_seed=99, pval_cutoff=0.05, dist_type='cosine',
                                            num_top_dims=False, predict_level='Predict Category',
                                            truth_level=1):
