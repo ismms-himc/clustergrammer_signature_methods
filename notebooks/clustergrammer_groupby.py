@@ -12,7 +12,12 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
 
     ''' Generate signatures for column categories '''
 
-    df = row_tuple_to_multiindex(df_ini.transpose())
+    df_t = df_ini.transpose()
+
+    # remove columns with constant values
+    df_t = df_t.loc[:, (df_t != df_t.iloc[0]).any()]
+
+    df = row_tuple_to_multiindex(df_t)
 
     cell_types = sorted(list(set(df.index.get_level_values(category_level).tolist())))
 
