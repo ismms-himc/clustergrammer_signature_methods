@@ -1,12 +1,58 @@
 import pandas as pd
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind, mannwhitneyu
 from copy import deepcopy
 from sklearn.metrics import pairwise_distances
+from scipy.spatial.distance import pdist
 from copy import deepcopy
 from sklearn.metrics import confusion_matrix
 from copy import deepcopy
 import numpy as np
 import random
+from itertools import combinations
+
+def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equal_var=False):
+    '''
+    Calculate the similarity of samples from the same and different categories. The
+    cat_index gives the index of the category, where 1 in the first category.
+    '''
+
+    cols = df.columns.tolist()
+
+    # compute distnace between rows (transpose to get cols as rows)
+    dist_arr = 1 - pdist(df.transpose(), metric=dist_type)
+    dist_arr.shape
+
+    # generate sample names with categories
+    sample_combos = list(combinations(range(df.shape[1]),2))
+    sample_names = [(cols[x[0]][0] + '_' + cols[x[1]][0], cols[x[0]][cat_index], cols[x[1]][cat_index])
+                    for x in sample_combos]
+
+    ser_dist = pd.Series(data=dist_arr, index=sample_names)
+
+    # find same-cat sample comparisons
+    same_cat = [x for x in sample_names if x[1] == x[2]]
+
+    # find diff-cat sample comparisons
+    diff_cat = [x for x in sample_names if x[1] != x[2]]
+
+    # make series of same and diff category sample comparisons
+    ser_same = ser_dist[same_cat]
+    ser_same.name = 'Same Category'
+    ser_diff = ser_dist[diff_cat]
+    ser_diff.name = 'Different Category'
+
+    sim_dict = {}
+    sim_dict['same'] = ser_same
+    sim_dict['diff'] = ser_diff
+
+    df_sim_cats = pd.DataFrame([ser_same, ser_diff]).transpose()
+
+    pval_dict = {}
+    ttest_stat, pval_dict['ttest'] = ttest_ind(ser_diff, ser_same, equal_var=equal_var)
+
+    ttest_stat, pval_dict['mannwhitney'] = mannwhitneyu(ser_diff, ser_same)
+
+    return sim_dict, pval_dict
 
 def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=False):
 
