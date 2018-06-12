@@ -106,7 +106,7 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
     return df_sig, keep_genes, keep_genes_dict
 
 def predict_cats_from_sigs(df_data_ini, df_sig_ini, dist_type='cosine', predict_level='Predict Category',
-                           truth_level=1):
+                           truth_level=1, unknown_thresh=-1):
     ''' Predict category using signature '''
 
     keep_rows = df_sig_ini.index.tolist()
@@ -126,9 +126,17 @@ def predict_cats_from_sigs(df_data_ini, df_sig_ini, dist_type='cosine', predict_
     # get the top column value (most similar signature)
     df_sim_top = df_sim.idxmax(axis=1)
 
+    # get the maximum similarity of a cell to a cell type definition
+    max_sim = df_sim.max(axis=1)
+
+    unknown_cells = max_sim[max_sim < unknown_thresh].index.tolist()
+
+    # assign unknown cells (need category of same name)
+    df_sim_top[unknown_cells] = 'Unknown'
+
     # add predicted category name to top list
     top_list = df_sim_top.get_values()
-    top_list = [ predict_level + ': ' + x[0] for x in top_list]
+    top_list = [ predict_level + ': ' + x[0] if type(x) is tuple else predict_level + ': ' + x  for x in top_list]
 
     # add cell type category to input data
     df_cat = deepcopy(df_data)
@@ -139,7 +147,6 @@ def predict_cats_from_sigs(df_data_ini, df_sig_ini, dist_type='cosine', predict_
     has_truth = False
     if type(cols[0]) is tuple:
         has_truth = True
-
 
     if has_truth:
         new_cols = [tuple(list(a) + [b]) for a,b in zip(cols, top_list)]
@@ -158,88 +165,7 @@ def predict_cats_from_sigs(df_data_ini, df_sig_ini, dist_type='cosine', predict_
         y_info['true'] = [x[truth_level].split(': ')[1] for x in cols]
         y_info['pred'] = [x.split(': ')[1] for x in top_list]
 
-
-
     return df_cat, df_sim.transpose(), y_info
-
-def OLD_predict_cats_from_sigs(df_data_ini, df_sig, dist_type='cosine', predict_level='Predict Category',
-                           truth_level=1):
-    ''' Predict category using signature '''
-
-    keep_rows = df_sig.index.tolist()
-    df_data = deepcopy(df_data_ini.ix[keep_rows])
-    # print('df_data: ', df_data.shape)
-
-    # calculate sim_mat of df_data and df_sig
-    cell_types = df_sig.columns.tolist()
-    barcodes = df_data.columns.tolist()
-    sim_mat = 1 - pairwise_distances(df_sig.transpose(), df_data.transpose(), metric=dist_type)
-    df_sim = pd.DataFrame(data=sim_mat, index=cell_types, columns=barcodes).transpose()
-    # print(df_sim.shape)
-
-    # ser_list = []
-    top_list = []
-    rows = df_sim.index.tolist()
-
-    for inst_row in rows:
-
-        # make ser_data_sim
-        inst_ser = df_sim.loc[[inst_row]]
-        inst_data = inst_ser.get_values()[0]
-        inst_cols = inst_ser.columns.tolist()
-        ser_data_sim = pd.Series(data=inst_data, index=inst_cols, name=inst_row).sort_values(ascending=False)
-
-        # define top matching cell type
-        top_ct_1 = ser_data_sim.index.tolist()[0]
-
-        # use cell type signature
-        found_ct = top_ct_1
-
-        # make binary matrix of ct_max
-        inst_zeros = np.zeros((len(inst_cols)))
-        max_ser = pd.Series(data=inst_zeros, index=inst_cols, name=inst_row)
-        max_ser[found_ct] = 1
-        top_list.append(found_ct)
-        ser_list.append(max_ser)
-
-    # # make matrix of top cell type identified
-    # df_sim_top = pd.concat(ser_list, axis=1).transpose()
-
-    y_info = {}
-    y_info['true'] = []
-    y_info['pred'] = []
-
-    # add cell type category to input data
-    df_cat = deepcopy(df_data)
-    cols = df_cat.columns.tolist()
-
-    # check whether the columns have the true category available
-    has_truth = False
-    if type(cols[0]) is tuple:
-        has_truth = True
-
-    new_cols = []
-    for i in range(len(cols)):
-
-        if has_truth:
-            inst_col = list(cols[i])
-            inst_col.append(predict_level + ': ' + top_list[i][0])
-            new_col = tuple(inst_col)
-        else:
-            inst_col = cols[i]
-            new_col = (inst_col, predict_level + ': ' + top_list[i][0])
-
-        new_cols.append(new_col)
-
-        if has_truth:
-            # store true and predicted lists
-            y_info['true'].append(inst_col[truth_level].split(': ')[1])
-            y_info['pred'].append(top_list[i][0])
-
-    df_cat.columns = new_cols
-
-    return df_cat, df_sim.transpose(), df_sim.transpose(), y_info
-
 
 def confusion_matrix_and_correct_series(y_info):
     ''' Generate confusion matrix from y_info '''
@@ -251,7 +177,7 @@ def confusion_matrix_and_correct_series(y_info):
     a = deepcopy(y_info['pred'])
     pred_count = dict((i, a.count(i)) for i in set(a))
 
-    sorted_cats = sorted(list(set(y_info['true'])))
+    sorted_cats = sorted(list(set(y_info['true'] + y_info['pred'])))
     conf_mat = confusion_matrix(y_info['true'], y_info['pred'], sorted_cats)
     df_conf = pd.DataFrame(conf_mat, index=sorted_cats, columns=sorted_cats)
 
@@ -279,7 +205,7 @@ def confusion_matrix_and_correct_series(y_info):
 def compare_performance_to_shuffled_labels(df_data, category_level, num_shuffles=100,
                                            random_seed=99, pval_cutoff=0.05, dist_type='cosine',
                                            num_top_dims=False, predict_level='Predict Category',
-                                           truth_level=1):
+                                           truth_level=1, unknown_thresh=-1):
     random.seed(random_seed)
 
     perform_list = []
@@ -308,7 +234,8 @@ def compare_performance_to_shuffled_labels(df_data, category_level, num_shuffles
 
         # predict categories from signature
         df_pred_cat, df_sig_sim, y_info = predict_cats_from_sigs(df_shuffle, df_sig,
-            dist_type=dist_type, predict_level=predict_level, truth_level=truth_level)
+            dist_type=dist_type, predict_level=predict_level, truth_level=truth_level,
+            unknown_thresh=unknown_thresh)
 
         # calc confusion matrix and performance
         df_conf, populations, ser_correct, fraction_correct = confusion_matrix_and_correct_series(y_info)
