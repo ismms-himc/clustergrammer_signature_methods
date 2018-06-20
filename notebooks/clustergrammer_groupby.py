@@ -69,6 +69,7 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
 
     keep_genes = []
     keep_genes_dict = {}
+    gene_pval_dict = {}
 
     for inst_ct in cell_types:
 
@@ -83,6 +84,8 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
             ser_pval_keep = ser_pval[ser_pval < pval_cutoff]
         else:
             ser_pval_keep = ser_pval[:num_top_dims]
+
+        gene_pval_dict[inst_ct] = ser_pval_keep
 
         inst_keep = ser_pval_keep.index.tolist()
         keep_genes.extend(inst_keep)
@@ -103,7 +106,9 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=F
     if len(keep_genes) == 0:
         print('found no informative dimensions')
 
-    return df_sig, keep_genes, keep_genes_dict
+    df_gene_pval = pd.concat(gene_pval_dict, axis=1)
+
+    return df_sig, keep_genes_dict, df_gene_pval
 
 def predict_cats_from_sigs(df_data_ini, df_sig_ini, dist_type='cosine', predict_level='Predict Category',
                            truth_level=1, unknown_thresh=-1):
@@ -317,7 +322,7 @@ def box_scatter_plot(df, group, columns=False, rand_seed=100, alpha=0.5,
             plt.scatter(x, val, c=dot_color, alpha=alpha)
 
 
-        df_arranged = pd.concat(vals, axis=1)
+        df_arranged = pd.a(vals, axis=1)
 
         # anova
         anova_data = [df_arranged[col].dropna() for col in df_arranged]
