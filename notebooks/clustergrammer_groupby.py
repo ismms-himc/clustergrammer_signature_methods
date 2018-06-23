@@ -412,10 +412,17 @@ def row_tuple_to_multiindex(df):
     df_mi = deepcopy(df)
     rows = df_mi.index.tolist()
     titles = []
+
+    # grab titles from tuples
     for inst_part in rows[0]:
 
-        if ': ' in inst_part:
-            inst_title = inst_part.split(': ')[0]
+        # dealing with integer names
+        if type(inst_part) == str:
+            if ': ' in inst_part:
+                inst_title = inst_part.split(': ')[0]
+            else:
+                inst_title = 'Name'
+
         else:
             inst_title = 'Name'
         titles.append(inst_title)
@@ -423,11 +430,17 @@ def row_tuple_to_multiindex(df):
     new_rows = []
     for inst_row in rows:
         inst_row = list(inst_row)
+
         new_row = []
         for inst_part in inst_row:
-            if ': ' in inst_part:
-                inst_part = inst_part.split(': ')[1]
+
+            # dealing with integer names
+            if type(inst_part) == str:
+                if ': ' in inst_part:
+                    inst_part = inst_part.split(': ')[1]
+
             new_row.append(inst_part)
+
         new_row = tuple(new_row)
         new_rows.append(new_row)
 
