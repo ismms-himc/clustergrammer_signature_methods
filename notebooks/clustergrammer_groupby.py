@@ -9,6 +9,10 @@ from copy import deepcopy
 import numpy as np
 import random
 from itertools import combinations
+from sklearn.metrics import roc_curve
+from sklearn.metrics import auc
+import matplotlib.pyplot as plt
+# %matplotlib inline
 
 def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equal_var=False):
     '''
@@ -24,7 +28,7 @@ def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equa
 
     # generate sample names with categories
     sample_combos = list(combinations(range(df.shape[1]),2))
-    sample_names = [(cols[x[0]][0] + '_' + cols[x[1]][0], cols[x[0]][cat_index], cols[x[1]][cat_index])
+    sample_names = [(cols[x[0]][cat_index] + '_' + cols[x[1]][cat_index], cols[x[0]][cat_index], cols[x[1]][cat_index])
                     for x in sample_combos]
 
     ser_dist = pd.Series(data=dist_arr, index=sample_names)
@@ -45,14 +49,40 @@ def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equa
     sim_dict['same'] = ser_same
     sim_dict['diff'] = ser_diff
 
-    df_sim_cats = pd.DataFrame([ser_same, ser_diff]).transpose()
-
     pval_dict = {}
     ttest_stat, pval_dict['ttest'] = ttest_ind(ser_diff, ser_same, equal_var=equal_var)
 
     ttest_stat, pval_dict['mannwhitney'] = mannwhitneyu(ser_diff, ser_same)
 
-    return sim_dict, pval_dict
+    # calc AUC
+    true_index = list(np.ones(sim_dict['same'].shape[0]))
+    false_index = list(np.zeros(sim_dict['diff'].shape[0]))
+    y_true = true_index + false_index
+
+    true_val = list(sim_dict['same'].get_values())
+    false_val = list(sim_dict['diff'].get_values())
+    y_score = true_val + false_val
+
+    fpr, tpr, thresholds = roc_curve(y_true, y_score)
+
+    inst_auc = auc(fpr, tpr)
+
+    plt.figure()
+    plt.plot(fpr, tpr)
+    plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+    plt.figure(figsize=(10,10))
+
+    roc_data = {}
+    roc_data['true'] = y_true
+    roc_data['score'] = y_score
+    roc_data['fpr'] = fpr
+    roc_data['tpr'] = tpr
+    roc_data['thresholds'] = thresholds
+    roc_data['auc'] = inst_auc
+
+    print('AUC', inst_auc)
+
+    return sim_dict, pval_dict, roc_data
 
 def generate_signatures(df_ini, category_level, pval_cutoff=0.05, num_top_dims=False):
 
