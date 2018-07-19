@@ -82,7 +82,7 @@ def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equa
     return sim_dict, pval_dict, roc_data
 
 def generate_signatures(df_ini, category_level, pval_cutoff=0.05,
-                        num_top_dims=False, verbose=True):
+                        num_top_dims=False, verbose=True, equal_var=False):
 
     ''' Generate signatures for column categories '''
 
@@ -113,7 +113,7 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05,
         fold_info['log2_fold'] = fold_info['log2_fold'].apply(np.log2)
         all_fold_info[inst_ct] = fold_info
 
-        inst_stats, inst_pvals = ttest_ind(inst_ct_mat, inst_other_mat, axis=0)
+        inst_stats, inst_pvals = ttest_ind(inst_ct_mat, inst_other_mat, axis=0, equal_var=equal_var)
 
         ser_pval = pd.Series(data=inst_pvals, index=df.columns.tolist()).sort_values()
 
