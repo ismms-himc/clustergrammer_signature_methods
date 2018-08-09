@@ -11,7 +11,9 @@ import random
 from itertools import combinations
 import matplotlib.pyplot as plt
 
-def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equal_var=False):
+def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine',
+                                       equal_var=False, plot_roc=True,
+                                       precalc_dist=False):
     '''
     Calculate the similarity of samples from the same and different categories. The
     cat_index gives the index of the category, where 1 in the first category.
@@ -19,9 +21,11 @@ def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equa
 
     cols = df.columns.tolist()
 
-    # compute distnace between rows (transpose to get cols as rows)
-    dist_arr = 1 - pdist(df.transpose(), metric=dist_type)
-    dist_arr.shape
+    if type(precalc_dist) == bool:
+        # compute distnace between rows (transpose to get cols as rows)
+        dist_arr = 1 - pdist(df.transpose(), metric=dist_type)
+    else:
+        dist_arr = precalc_dist
 
     # generate sample names with categories
     sample_combos = list(combinations(range(df.shape[1]),2))
@@ -64,10 +68,13 @@ def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equa
 
     inst_auc = auc(fpr, tpr)
 
-    plt.figure()
-    plt.plot(fpr, tpr)
-    plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-    plt.figure(figsize=(10,10))
+    if plot_roc:
+        plt.figure()
+        plt.plot(fpr, tpr)
+        plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+        plt.figure(figsize=(10,10))
+
+        print('AUC', inst_auc)
 
     roc_data = {}
     roc_data['true'] = y_true
@@ -77,9 +84,9 @@ def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine', equa
     roc_data['thresholds'] = thresholds
     roc_data['auc'] = inst_auc
 
-    print('AUC', inst_auc)
 
     return sim_dict, pval_dict, roc_data
+
 
 def generate_signatures(df_ini, category_level, pval_cutoff=0.05,
                         num_top_dims=False, verbose=True, equal_var=False):
@@ -143,7 +150,7 @@ def generate_signatures(df_ini, category_level, pval_cutoff=0.05,
     if len(keep_genes) == 0 and verbose:
         print('found no informative dimensions')
 
-    df_gene_pval = pd.concat(gene_pval_dict, axis=1, sort=False)
+    df_gene_pval = pd.concat(gene_pval_dict, axis=1)
 
     return df_sig, keep_genes_dict, df_gene_pval, all_fold_info
 
@@ -247,11 +254,16 @@ def confusion_matrix_and_correct_series(y_info):
 def compare_performance_to_shuffled_labels(df_data, category_level, num_shuffles=100,
                                            random_seed=99, pval_cutoff=0.05, dist_type='cosine',
                                            num_top_dims=False, predict_level='Predict Category',
-                                           truth_level=1, unknown_thresh=-1, verbose=True):
+                                           truth_level=1, unknown_thresh=-1, equal_var=False,
+                                           performance_type='prediction'):
     random.seed(random_seed)
 
     perform_list = []
     num_shuffles = num_shuffles
+
+    # pre-calculate the distance matrix (similarity matrix) if necessary
+    if performance_type == 'cat_sim_auc':
+        dist_arr = 1 - pdist(df_data.transpose(), metric=dist_type)
 
     for inst_run in range(num_shuffles + 1):
 
@@ -269,12 +281,15 @@ def compare_performance_to_shuffled_labels(df_data, category_level, num_shuffles
         else:
             df_shuffle = pd.DataFrame(data=mat, columns=shuffled_cols, index=rows)
 
-        try:
-            # generate signature on shuffled data
-            df_sig, keep_genes, keep_genes_dict, df_fold = generate_signatures(df_shuffle, category_level,
-                                                                          pval_cutoff=pval_cutoff,
-                                                                          num_top_dims=num_top_dims,
-                                                                          verbose=verbose)
+        # generate signature on shuffled data
+        df_sig, keep_genes, keep_genes_dict, fold_info = generate_signatures(df_shuffle,
+                                                           category_level,
+                                                           pval_cutoff=pval_cutoff,
+                                                           num_top_dims=num_top_dims,
+                                                           equal_var=equal_var)
+
+        # predictive performance
+        if performance_type == 'prediction':
 
             # predict categories from signature
             df_pred_cat, df_sig_sim, y_info = predict_cats_from_sigs(df_shuffle, df_sig,
@@ -288,14 +303,26 @@ def compare_performance_to_shuffled_labels(df_data, category_level, num_shuffles
             if inst_run > 0:
                 perform_list.append(fraction_correct)
             else:
+                real_performance = fraction_correct
                 print('performance (fraction correct) of unshuffled: ' + str(fraction_correct))
 
-        except:
-            if verbose:
-                print('shuffled signature failed')
+        elif performance_type == 'cat_sim_auc':
 
+            # predict categories from signature
+            sim_dict, pval_dict, roc_data = sim_same_and_diff_category_samples(df_shuffle,
+                cat_index=1, plot_roc=False, equal_var=equal_var, precalc_dist=dist_arr)
+
+            # store performances of shuffles
+            if inst_run > 0:
+                perform_list.append(roc_data['auc'])
+            else:
+                real_performance = roc_data['auc']
+                print('performance (category similarity auc) of unshuffled: ' + str(roc_data['auc']))
 
     perform_ser = pd.Series(perform_list)
+
+    in_top_fraction = perform_ser[perform_ser > real_performance].shape[0]/num_shuffles
+    print('real data performs in the top ' + str(in_top_fraction*100) + '% of shuffled labels\n')
 
     return perform_ser
 
