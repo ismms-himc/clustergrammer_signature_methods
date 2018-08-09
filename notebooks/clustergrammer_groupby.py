@@ -16,12 +16,7 @@ def sim_same_and_diff_category_samples(df, cat_index=1, dist_type='cosine',
                                        precalc_dist=False):
     '''
     Calculate the similarity of samples from the same and different categories. The
-    cat_index gives the index of the category, where 1 is the first category.
-
-    Need to make a 1 vs all category comparison where all other categories, but
-    the category of interest are set to the same category. This will give us a
-    measure of the quality of a single category at a time rather than mixing the
-    quality of all categories into one metric.
+    cat_index gives the index of the category, where 1 in the first category.
     '''
 
     cols = df.columns.tolist()
