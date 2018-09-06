@@ -1,7 +1,14 @@
 numpy==1.13.1
 pandas==0.22.0
 scipy==1.1.0
+<<<<<<< HEAD
 scikit-learn==0.19.2
 ipywidgets==7.3.0
 clustergrammer==1.13.5
 clustergrammer_widget2==0.4.5
+=======
+sklearn
+ipywidgets==7.3.0
+clustergrammer
+clustergrammer_widget2
+>>>>>>> 036ac95a90b1c396393830616f0001a03cb981a4
