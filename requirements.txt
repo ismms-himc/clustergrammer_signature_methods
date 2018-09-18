@@ -5,4 +5,4 @@ scikit-learn==0.19.2
 ipywidgets==7.3.0
 matplotlib==2.2.3
 clustergrammer==1.13.5
-clustergrammer_widget2==0.4.5
+clustergrammer_widget2==0.5.1
