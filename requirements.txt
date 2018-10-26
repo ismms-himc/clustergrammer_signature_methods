@@ -6,3 +6,4 @@ ipywidgets==7.3.0
 matplotlib==2.2.3
 clustergrammer==1.13.5
 clustergrammer_widget2==0.6.2
+clustergrammer2==0.2.1
